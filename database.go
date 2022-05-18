@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"strings"
 
@@ -32,20 +31,59 @@ func CreateStorage() *Storage {
 		database: postgres,
 	}
 
-	storage.init()
 	return storage
 }
 
-func (storage Storage) init() {
-	contents, err := ioutil.ReadFile("./setup.sql")
+func (storage Storage) CreateKillBoard(channelID string, guildID string, groupId uint) {
+	killboard := `INSERT INTO channels (channel_id, guild_id, type, group_id) VALUES ($1, $2, 'KillBoard', $3)`
+
+	_, err := storage.database.Exec(killboard, channelID, guildID, groupId)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+	}
+}
+
+func (storage Storage) FindKillboard(channelID string, guildID string) (uint, error) {
+	var groupID uint
+	query := `SELECT group_ID FROM channels WHERE type = 'KillBoard' AND channel_id=$1 AND guild_id=$2`
+
+	row := storage.database.QueryRow(query, channelID, guildID)
+	switch error := row.Scan(&groupID); error {
+	case sql.ErrNoRows:
+		return groupID, sql.ErrNoRows
+	case nil:
+		return groupID, nil
+	default:
+		return groupID, error
+	}
+}
+
+func (storage Storage) FindKillboards(ids []uint) []KillBoard {
+	killboards := []KillBoard{}
+	conv := []string{}
+
+	for _, id := range ids {
+		conv = append(conv, fmt.Sprintf("%d", id))
 	}
 
-	_, err = storage.database.Exec(string(contents))
+	values := strings.Join(conv[:], ",")
+	query := fmt.Sprintf(`SELECT channel_id, guild_id, group_id FROM channels WHERE type = 'KillBoard' AND group_id IN (%s)`, values)
+
+	rows, err := storage.database.Query(query)
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+	} else {
+		for rows.Next() {
+			board, err := readKillBoard(rows)
+			if err != nil {
+				log.Println(err)
+			} else {
+				killboards = append(killboards, board)
+			}
+		}
 	}
+
+	return killboards
 }
 
 func (storage Storage) CreateNames(names map[uint]esi.NameRef) {
@@ -55,7 +93,8 @@ func (storage Storage) CreateNames(names map[uint]esi.NameRef) {
 		items := []string{}
 		for _, ref := range names {
 			if ref.Category != "character" {
-				items = append(items, fmt.Sprintf(values, ref.ID, ref.Category, ref.Name))
+				name := strings.ReplaceAll(ref.Name, "'", "''")
+				items = append(items, fmt.Sprintf(values, ref.ID, ref.Category, name))
 			}
 		}
 
@@ -64,6 +103,7 @@ func (storage Storage) CreateNames(names map[uint]esi.NameRef) {
 
 			_, err := storage.database.Exec(query)
 			if err != nil {
+				log.Println(query)
 				log.Println(err)
 			}
 		}

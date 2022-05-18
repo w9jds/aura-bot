@@ -1,13 +1,9 @@
-DROP TABLE IF EXISTS killboards;
-DROP INDEX IF EXISTS idx_killboard;
--- DROP TABLE IF EXISTS names;
-
--- CREATE TYPE FeedType AS ENUM ('KillBoard', 'SRP');
+CREATE TYPE ChannelType AS ENUM ('KillBoard', 'SRP');
 
 CREATE TABLE IF NOT EXISTS channels (
   channel_id TEXT NOT NULL,
   guild_id TEXT NOT NULL,
-  type FeedType NOT NULL,
+  type ChannelType NOT NULL,
   group_id INTEGER
 );
 

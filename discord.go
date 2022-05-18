@@ -70,7 +70,7 @@ func handleCreateFeed(session *discordgo.Session, i *discordgo.InteractionCreate
 			},
 		})
 	} else {
-		go storage.CreateKillBoard(i.ChannelID, i.GuildID, options["groupid"])
+		go storage.CreateKillBoard(i.ChannelID, i.GuildID, uint(options["groupid"].UintValue()))
 		session.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
