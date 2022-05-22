@@ -12,13 +12,7 @@ import (
 	"golang.org/x/text/message"
 )
 
-type KillBoard struct {
-	GroupID   uint   `json:"group_id"`
-	GuildID   string `json:"guild_id"`
-	ChannelID string `json:"channel_id"`
-}
-
-func shareKillBoardMail(board KillBoard, mail *esi.KillMail, names map[uint]esi.NameRef, value float64) {
+func postKillBoardMail(board ChannelConfig, mail *esi.KillMail, names map[uint]esi.NameRef, value float64) {
 	var title string
 	printer := message.NewPrinter(language.English)
 
@@ -131,17 +125,17 @@ func shareKillBoardMail(board KillBoard, mail *esi.KillMail, names map[uint]esi.
 	}
 }
 
-func victim(board KillBoard, mail *esi.KillMail) bool {
-	return mail.Victim.AllianceID == uint32(board.GroupID) || mail.Victim.CorporationID == uint32(board.GroupID)
+func victim(board ChannelConfig, mail *esi.KillMail) bool {
+	return mail.Victim.AllianceID == uint32(board.FilterID) || mail.Victim.CorporationID == uint32(board.FilterID)
 }
 
-func attackers(board KillBoard, mail *esi.KillMail) (bool, CharacterRef, []uint32) {
+func attackers(board ChannelConfig, mail *esi.KillMail) (bool, CharacterRef, []uint32) {
 	var finalBlow CharacterRef
 	friendlies := []uint32{}
 	isAttacker := false
 
 	for _, attacker := range mail.Attackers {
-		isFriendly := attacker.CorporationID == uint32(board.GroupID) || attacker.AllianceID == uint32(board.GroupID)
+		isFriendly := attacker.CorporationID == uint32(board.FilterID) || attacker.AllianceID == uint32(board.FilterID)
 
 		if isFriendly {
 			isAttacker = true
@@ -160,10 +154,10 @@ func attackers(board KillBoard, mail *esi.KillMail) (bool, CharacterRef, []uint3
 	return isAttacker, finalBlow, friendlies
 }
 
-func readKillBoard(row *sql.Rows) (KillBoard, error) {
-	board := KillBoard{}
+func readKillBoard(row *sql.Rows) (ChannelConfig, error) {
+	board := ChannelConfig{}
 
-	switch error := row.Scan(&board.ChannelID, &board.GuildID, &board.GroupID); error {
+	switch error := row.Scan(&board.ChannelID, &board.GuildID, &board.FilterID); error {
 	case nil:
 		return board, nil
 	default:

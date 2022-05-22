@@ -14,6 +14,12 @@ type Storage struct {
 	database *sql.DB
 }
 
+type ChannelConfig struct {
+	FilterID  uint   `json:"filter_id"`
+	GuildID   string `json:"guild_id"`
+	ChannelID string `json:"channel_id"`
+}
+
 func CreateStorage() *Storage {
 	password := getEnv("POSTGRES_PASSWORD", true)
 	host := getEnv("POSTGRES_HOSTNAME", true)
@@ -34,8 +40,54 @@ func CreateStorage() *Storage {
 	return storage
 }
 
+func (storage Storage) CreateSystemWatch(channelID string, guildID string, systemID uint, ignoreList string, minValue float64) {
+	watch := fmt.Sprintf(
+		`INSERT INTO watchers (channel_id, guild_id, filter_ids, ignore_list, min_value) VALUES ($1, $2, ARRAY[%d]::int[], ARRAY[%s]::int[], $3)`,
+		systemID,
+		ignoreList,
+	)
+
+	_, err := storage.database.Exec(watch, channelID, guildID, minValue)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (storage Storage) FindSystemWatch(systemId uint, ids []uint, value float64) []string {
+	channels := []string{}
+	conv := []string{}
+
+	for _, id := range ids {
+		conv = append(conv, fmt.Sprintf("%d", id))
+	}
+
+	query := fmt.Sprintf(
+		`SELECT DISTINCT(channel_id) FROM watchers WHERE filter_ids && '{%d}' AND min_value < %f AND NOT ignore_list && '{%s}'`,
+		systemId,
+		value,
+		strings.Join(conv[:], ","),
+	)
+
+	rows, err := storage.database.Query(query)
+	if err != nil {
+		log.Println(err)
+	} else {
+		for rows.Next() {
+			var channel string
+			err := rows.Scan(&channel)
+			if err != nil {
+				log.Println(err)
+			} else {
+				channels = append(channels, channel)
+			}
+		}
+	}
+
+	return channels
+}
+
 func (storage Storage) CreateKillBoard(channelID string, guildID string, groupId uint) {
-	killboard := `INSERT INTO channels (channel_id, guild_id, type, group_id) VALUES ($1, $2, 'KillBoard', $3)`
+	killboard := `INSERT INTO channels (channel_id, guild_id, type, filter_id) VALUES ($1, $2, 'killboard', $3)`
 
 	_, err := storage.database.Exec(killboard, channelID, guildID, groupId)
 	if err != nil {
@@ -45,7 +97,7 @@ func (storage Storage) CreateKillBoard(channelID string, guildID string, groupId
 
 func (storage Storage) FindKillboard(channelID string, guildID string) (uint, error) {
 	var groupID uint
-	query := `SELECT group_ID FROM channels WHERE type = 'KillBoard' AND channel_id=$1 AND guild_id=$2`
+	query := `SELECT filter_id FROM channels WHERE type = 'killboard' AND channel_id=$1 AND guild_id=$2`
 
 	row := storage.database.QueryRow(query, channelID, guildID)
 	switch error := row.Scan(&groupID); error {
@@ -58,8 +110,8 @@ func (storage Storage) FindKillboard(channelID string, guildID string) (uint, er
 	}
 }
 
-func (storage Storage) FindKillboards(ids []uint) []KillBoard {
-	killboards := []KillBoard{}
+func (storage Storage) FindKillboards(ids []uint) []ChannelConfig {
+	killboards := []ChannelConfig{}
 	conv := []string{}
 
 	for _, id := range ids {
@@ -67,7 +119,7 @@ func (storage Storage) FindKillboards(ids []uint) []KillBoard {
 	}
 
 	values := strings.Join(conv[:], ",")
-	query := fmt.Sprintf(`SELECT channel_id, guild_id, group_id FROM channels WHERE type = 'KillBoard' AND group_id IN (%s)`, values)
+	query := fmt.Sprintf(`SELECT channel_id, guild_id, filter_id FROM channels WHERE type = 'killboard' AND filter_id IN (%s)`, values)
 
 	rows, err := storage.database.Query(query)
 	if err != nil {

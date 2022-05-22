@@ -47,7 +47,7 @@ func formatCurrency(value float64) string {
 
 func getHullAppraisal(killmail *esi.KillMail, fitting *esi.KillFitting) (*evepraisal.Response, error) {
 	items := []*evepraisal.AppraisalItem{
-		&evepraisal.AppraisalItem{
+		{
 			TypeID:   killmail.Victim.ShipTypeID,
 			Quantity: 1,
 		},
@@ -78,7 +78,7 @@ func addFittingItems(items []*evepraisal.AppraisalItem, slots map[uint32]*esi.Ki
 
 func getFittedAppraisal(killmail *esi.KillMail, fitting *esi.KillFitting) (*evepraisal.Response, error) {
 	items := []*evepraisal.AppraisalItem{
-		&evepraisal.AppraisalItem{
+		{
 			TypeID:   killmail.Victim.ShipTypeID,
 			Quantity: 1,
 		},

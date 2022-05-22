@@ -24,7 +24,7 @@ func fetch() {
 			continue
 		}
 
-		process(bundle)
+		go process(bundle)
 	}
 }
 
@@ -40,15 +40,20 @@ func process(redis *zkb.RedisResponse) {
 	}
 
 	ids := getUniqueIds(killMail)
-	names := storage.FindNames(ids)
 
 	killboards := storage.FindKillboards(ids)
-	if len(killboards) > 0 {
+	watchers := storage.FindSystemWatch(uint(killMail.SystemID), ids, redis.Zkb.TotalValue)
+
+	if len(killboards) > 0 || len(watchers) > 0 {
+		names := storage.FindNames(ids)
+
 		for _, killboard := range killboards {
-			go shareKillBoardMail(killboard, killMail, names, redis.Zkb.TotalValue)
+			go postKillBoardMail(killboard, killMail, names, redis.Zkb.TotalValue)
+		}
+		for _, watcher := range watchers {
+			go postSystemWatchMail(watcher, killMail, names, redis.Zkb.TotalValue)
 		}
 	}
-
 }
 
 func isRecentKill(killMail *esi.KillMail) bool {
